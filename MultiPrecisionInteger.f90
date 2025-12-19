@@ -92,7 +92,7 @@ PURE FUNCTION new_mpi_from_integer(x_in) RESULT(mpi_out)
 END FUNCTION new_mpi_from_integer
 
 PURE FUNCTION mpi_to_integer(mpi_in) RESULT(x)
-  TYPE(mpi), INTENT(IN) :: mpi_in
+  TYPE(mpi), INTENT(IN)   :: mpi_in
   INTEGER(KIND=8)         :: x
 
   ! INTEGER :: i
@@ -101,7 +101,7 @@ PURE FUNCTION mpi_to_integer(mpi_in) RESULT(x)
   !   IF (mpi_in%coeffs(i) /= 0_8) PRINT*, "ERROR in mpi_to_integer: Value is too large to fit."
   !   EXIT
   ! END DO
-
+  
   x = mpi_in%coeffs(1) + ISHFT(mpi_in%coeffs(2), 32)
 END FUNCTION mpi_to_integer
 
@@ -183,7 +183,7 @@ END FUNCTION mpi_shift_bits_left
 
 FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
   TYPE(mpi), INTENT(IN) :: mpi_in
-  INTEGER, INTENT(IN)     :: num_bits
+  INTEGER, INTENT(IN)   :: num_bits
   TYPE(mpi)             :: mpi_out
 
   TYPE(mpi) :: mpi_abs_in
@@ -197,8 +197,8 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
   END IF
 
   IF (mpi_is_zero(mpi_in)) THEN
-      mpi_out%coeffs = 0_8
-      RETURN
+    mpi_out%coeffs = 0_8
+    RETURN
   END IF
 
   is_negative = mpi_sign(mpi_in)
@@ -212,9 +212,9 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
 
   low_part = 0_8
   DO i = COEFFS_LIMIT, word_shift + 1, -1
-      high_part = IAND(ISHFT(mpi_abs_in%coeffs(i), -bit_shift), INT(Z'FFFFFFFF', KIND=8))
-      mpi_out%coeffs(i - word_shift) = IOR(high_part, low_part)
-      low_part = ISHFT(IAND(mpi_abs_in%coeffs(i), ISHFT(1_8, bit_shift) - 1_8), 32 - bit_shift)
+    high_part = IAND(ISHFT(mpi_abs_in%coeffs(i), -bit_shift), INT(Z'FFFFFFFF', KIND=8))
+    mpi_out%coeffs(i - word_shift) = IOR(high_part, low_part)
+    low_part = ISHFT(IAND(mpi_abs_in%coeffs(i), ISHFT(1_8, bit_shift) - 1_8), 32 - bit_shift)
   END DO
 
   IF (is_negative) mpi_out = -mpi_out

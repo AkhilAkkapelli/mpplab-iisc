@@ -4,10 +4,10 @@ PROGRAM test_mpi
 
   INTEGER(KIND=8), PARAMETER :: MASK32 = INT(Z'FFFFFFFF', KIND=8)
 
-  CALL test_normalization()
+  ! CALL test_normalization()
   ! CALL test_new_mpi_from_coeffs()
   ! CALL test_new_mpi_from_integer()
-  ! CALL test_mpi_to_integer()
+  CALL test_mpi_to_integer()
   ! CALL test_mpi_scalar_arithmetic()
   ! CALL test_string_conversions_edge_cases()
   ! CALL test_arithmetic_operators()
@@ -124,9 +124,9 @@ SUBROUTINE test_normalization()
   call execute_command_line("python3 ./tests/mpi_normalization.py", wait=.true.)
 #endif
 
-  OPEN(UNIT=unit_num, FILE='./bin/test_cases.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
+  OPEN(UNIT=unit_num, FILE='./bin/mpi_normalization_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
   IF (iostatus /= 0) THEN
-    PRINT *, "Error: Could not open 'test_cases.txt'. Run python generator first."
+    PRINT *, "Error: Could not open './bin/mpi_normalization_tests.txt'. Run python generator first."
     STOP
   END IF
 
@@ -165,6 +165,11 @@ END SUBROUTINE test_normalization
 SUBROUTINE test_new_mpi_from_coeffs()
     TYPE(mpi) :: mpi_val
 
+    integer::    ntests, npass= 0
+    integer::    unit_num= 10, iostatus, k
+    integer(8) :: expec_coeffs(COEFFS_LIMIT)
+    integer    :: exp_sign
+
     PRINT *, ""
     PRINT *, "--- Testing new_mpi_from_coeffs ---"
 
@@ -196,13 +201,60 @@ SUBROUTINE test_new_mpi_from_coeffs()
     mpi_val = new_mpi_from_coeffs([-MULTI_PRECISION_BASE, 1_8])
     CALL check_mpi("From Coeffs: Normalization to zero", mpi_val, [0_8, 0_8, 0_8, 0_8])
 
-    PRINT *, ""
+    ! Test 8: Comprehensive testing
+    ! generate test_files!
+#ifdef _WIN32
+  call execute_command_line("python ./tests/mpi_from_coeffs.py", wait=.true.)
+#elif defined(__GFORTRAN__)
+  call execute_command_line("python ./tests/mpi_from_coeffs.py", wait=.true.)
+#else
+  call execute_command_line("python3 ./tests/mpi_from_coeffs.py", wait=.true.)
+#endif
+
+  OPEN(UNIT=unit_num, FILE='./bin/mpi_from_coeffs_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
+  IF (iostatus /= 0) THEN
+    PRINT *, "Error: Could not open './bin/mpi_from_coeffs_tests.txt'. Run python generator first."
+    STOP
+  END IF
+! read no.of test cases from the file
+  read(unit_num, *)ntests
+  print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
+  
+  ! comprehensive testing
+  do k= 1, ntests
+    ! read line: [sign] [output coeffs]
+    read(unit_num, *)exp_sign, expec_coeffs
+    expec_coeffs = exp_sign*expec_coeffs
+
+    ! call routine
+    mpi_val= new_mpi_from_coeffs(expec_coeffs)
+
+    if (any(mpi_val%coeffs /= expec_coeffs)) then
+      continue
+    else
+      npass= npass + 1
+    end if  
+  end do
+  close(unit_num)
+
+  if (npass == ntests) then
+    print '(A,I0,A,I0,A)', "[PASS] From Coeffs: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  else
+    print '(A,I0,A,I0,A)', "[FAIL] From Coeffs: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  end if
+
+  PRINT *, ""
 
 END SUBROUTINE test_new_mpi_from_coeffs
 
 SUBROUTINE test_new_mpi_from_integer()
     TYPE(mpi) :: mpi_val
     INTEGER(KIND=8) :: int_val
+
+    integer::    ntests, npass= 0
+    integer::    unit_num= 10, iostatus, k
+    integer(8) :: expec_coeffs(COEFFS_LIMIT)
+    integer    :: exp_sign
 
     PRINT *, ""
     PRINT *, "--- Testing new_mpi_from_integer ---"
@@ -244,13 +296,61 @@ SUBROUTINE test_new_mpi_from_integer()
     mpi_val = new_mpi_from_integer(int_val)
     CALL check("From/To Integer: Round trip", mpi_to_integer(mpi_val) == int_val)
 
-    PRINT *, ""
+    ! Test 9: Comprehensive Testing
+    ! generate test_files!
+#ifdef _WIN32
+  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
+#elif defined(__GFORTRAN__)
+  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
+#else
+  call execute_command_line("python3 ./tests/mpi_from_int.py", wait=.true.)
+#endif
+
+  OPEN(UNIT=unit_num, FILE='./bin/mpi_from_int_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
+  IF (iostatus /= 0) THEN
+    PRINT *, "Error: Could not open './bin/mpi_from_int_tests.txt'. Run python generator first."
+    STOP
+  END IF
+  ! read no.of test cases from the file
+  read(unit_num, *)ntests
+  print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
+  
+  ! comprehensive testing
+  do k= 1, ntests
+    ! read line: [val] [sign] [output coeffs]
+    read(unit_num, *)int_val, exp_sign, expec_coeffs
+    expec_coeffs = exp_sign*expec_coeffs
+
+    ! call routine
+    mpi_val= new_mpi_from_integer(int_val)
+
+    ! check how many passed!
+    if (any(mpi_val%coeffs /= expec_coeffs)) then
+      continue
+    else
+      npass= npass + 1
+    end if  
+  end do
+  close(unit_num)
+
+  if (npass == ntests) then
+    print '(A,I0,A,I0,A)', "[PASS] From Integer: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  else
+    print '(A,I0,A,I0,A)', "[FAIL] From Integer: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  end if
+
+  PRINT *, ""
 
 END SUBROUTINE test_new_mpi_from_integer
 
 SUBROUTINE test_mpi_to_integer()
     TYPE(mpi) :: mpi_val
-    INTEGER(KIND=8) :: int_val, expected_val
+    INTEGER(KIND=8) :: int_val, exp_val
+
+    integer::    ntests, npass= 0
+    integer::    unit_num= 10, iostatus, k
+    integer(8) :: inp_coeffs(COEFFS_LIMIT)
+    integer    :: inp_sign
 
     PRINT *, ""
     PRINT *, "--- Testing mpi_to_integer ---"
@@ -271,16 +371,16 @@ SUBROUTINE test_mpi_to_integer()
     CALL check("To Integer: Small negative", int_val == -54321_8)
 
     ! Test 4: Large positive (two coefficients)
-    expected_val = MULTI_PRECISION_BASE * 2_8 + 123_8
+    exp_val = MULTI_PRECISION_BASE * 2_8 + 123_8
     mpi_val = new_mpi_from_coeffs([123_8, 2_8, 0_8, 0_8])
     int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Large positive", int_val == expected_val)
+    CALL check("To Integer: Large positive", int_val == exp_val)
 
     ! Test 5: Large negative (two coefficients)
-    expected_val = -(MULTI_PRECISION_BASE * 3_8 + 456_8)
+    exp_val = -(MULTI_PRECISION_BASE * 3_8 + 456_8)
     mpi_val = new_mpi_from_coeffs([-456_8, -3_8, 0_8, 0_8])
     int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Large negative", int_val == expected_val)
+    CALL check("To Integer: Large negative", int_val == exp_val)
 
     ! Test 6: Maximum 64-bit integer
     mpi_val = new_mpi_from_integer(HUGE(0_8))
@@ -291,6 +391,51 @@ SUBROUTINE test_mpi_to_integer()
     mpi_val = new_mpi_from_integer(-HUGE(0_8) - 1_8)
     int_val = mpi_to_integer(mpi_val)
     CALL check("To Integer: Most negative", int_val == -HUGE(0_8)-1_8)
+
+    ! Test 8: Comprehensive testing
+    ! generate test_files!
+#ifdef _WIN32
+  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
+#elif defined(__GFORTRAN__)
+  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
+#else
+  call execute_command_line("python3 ./tests/mpi_from_int.py", wait=.true.)
+#endif
+
+  OPEN(UNIT=unit_num, FILE='./bin/mpi_from_int_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
+  IF (iostatus /= 0) THEN
+    PRINT *, "Error: Could not open './bin/mpi_from_int_tests.txt'. Run python generator first."
+    STOP
+  END IF
+  ! read no.of test cases from the file
+  read(unit_num, *)ntests
+  print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
+  
+  ! comprehensive testing
+  do k= 1, ntests
+    ! read line: [exp_val] [inp_sign] [inp_coeffs]
+    read(unit_num, *)exp_val, inp_sign, inp_coeffs
+    mpi_val%coeffs = inp_sign*inp_coeffs
+
+    ! call routine
+    int_val= mpi_to_integer(mpi_val)
+
+    ! check how many passed!
+    if (int_val /= exp_val) then
+      continue
+    else
+      npass= npass + 1
+    end if  
+  end do
+  close(unit_num)
+
+  if (npass == ntests) then
+    print '(A,I0,A,I0,A)', "[PASS] To Integer: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  else
+    print '(A,I0,A,I0,A)', "[FAIL] To Integer: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  end if
+
+  PRINT *, ""
 
 END SUBROUTINE test_mpi_to_integer
 
