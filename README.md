@@ -6,4 +6,4 @@
 2. MPI from coefficients works, but normalization is used, which depends on 1. ❌
 3. New MPI from integer and MPI to integer work properly! ✅✅
 
-Comment (Akhil) : MPI coeffs cannot have mixed signs
+Comment (Akhil) : Resolved
