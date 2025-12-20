@@ -4,7 +4,7 @@ import sys
 # Constants for this case
 BASE= 2**32
 NCOEFFS= 4
-NTESTS= 5000
+NTESTS= 500000
 
 def to_coeffs_clean(val):
     '''

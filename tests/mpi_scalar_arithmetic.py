@@ -18,24 +18,33 @@ def to_coeffs_clean(val):
     return coeffs
 
 def generate_file():
-    print(f"[Python] Generating {NTESTS} test cases for normalization into 'mpi_from_int_tests.txt'...")
+    print(f"Generating {NTESTS} test cases for normalization into 'mpi_from_coeffs_tests.txt'...")
 
-    with open('./bin/mpi_from_int_tests.txt', "w") as f:
+    with open('./bin/mpi_scalar_mult.txt', "w") as f:
         # write header: num tests
         f.write(f"{NTESTS}\n")
 
         for _ in range(NTESTS):
             ## generate a random 64-bit number
-            val= random.randint(-2**63, 2**63 - 1)
+            val1= random.randint(-2**96+1, 2**96-1)
             
             # convert to coeffs
-            output_coeffs=to_coeffs_clean(abs(val))
-            sign= 1 if val >= 0 else -1
-            output_coeffs= [sign*c for c in output_coeffs]
+            c1=to_coeffs_clean(abs(val1))
+            sign= 1 if val1 >= 0 else -1
+            c1= [sign*c for c in c1]
+
+            # scalar
+            val2= random.randint(-2**31+1, 2**31 - 1)
+
+            # output
+            val_out= val1*val2
+            c2= to_coeffs_clean(abs(val_out))
+            sign= -1 if val_out < 0 else 1
+            c2= [sign*c for c in c2]
 
             # line up to be written
-            # format: [val] inp_coeffs
-            line_items= [val] + output_coeffs
+            # format: In0 In1 In2 In3 scalar Ex0 Ex1 Ex2 Ex3
+            line_items= c1 + [val2] + c2
             line_str=   " ".join(map(str, line_items))
             f.write(line_str + "\n")
 

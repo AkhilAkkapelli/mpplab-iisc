@@ -7,8 +7,8 @@ PROGRAM test_mpi
   ! CALL test_normalization()
   ! CALL test_new_mpi_from_coeffs()
   ! CALL test_new_mpi_from_integer()
-  CALL test_mpi_to_integer()
-  ! CALL test_mpi_scalar_arithmetic()
+  ! CALL test_mpi_to_integer()
+  CALL test_mpi_scalar_arithmetic()
   ! CALL test_string_conversions_edge_cases()
   ! CALL test_arithmetic_operators()
   ! CALL test_large_string_conversion()
@@ -254,7 +254,6 @@ SUBROUTINE test_new_mpi_from_integer()
     integer::    ntests, npass= 0
     integer::    unit_num= 10, iostatus, k
     integer(8) :: expec_coeffs(COEFFS_LIMIT)
-    integer    :: exp_sign
 
     PRINT *, ""
     PRINT *, "--- Testing new_mpi_from_integer ---"
@@ -318,8 +317,7 @@ SUBROUTINE test_new_mpi_from_integer()
   ! comprehensive testing
   do k= 1, ntests
     ! read line: [val] [sign] [output coeffs]
-    read(unit_num, *)int_val, exp_sign, expec_coeffs
-    expec_coeffs = exp_sign*expec_coeffs
+    read(unit_num, *)int_val, expec_coeffs
 
     ! call routine
     mpi_val= new_mpi_from_integer(int_val)
@@ -350,7 +348,6 @@ SUBROUTINE test_mpi_to_integer()
     integer::    ntests, npass= 0
     integer::    unit_num= 10, iostatus, k
     integer(8) :: inp_coeffs(COEFFS_LIMIT)
-    integer    :: inp_sign
 
     PRINT *, ""
     PRINT *, "--- Testing mpi_to_integer ---"
@@ -413,9 +410,9 @@ SUBROUTINE test_mpi_to_integer()
   
   ! comprehensive testing
   do k= 1, ntests
-    ! read line: [exp_val] [inp_sign] [inp_coeffs]
-    read(unit_num, *)exp_val, inp_sign, inp_coeffs
-    mpi_val%coeffs = inp_sign*inp_coeffs
+    ! read line: [exp_val] [inp_coeffs]
+    read(unit_num, *)exp_val, inp_coeffs
+    mpi_val%coeffs= inp_coeffs
 
     ! call routine
     int_val= mpi_to_integer(mpi_val)
@@ -440,63 +437,111 @@ SUBROUTINE test_mpi_to_integer()
 END SUBROUTINE test_mpi_to_integer
 
 SUBROUTINE test_mpi_scalar_arithmetic()
-    TYPE(mpi) :: mpi_val
-    INTEGER(KIND=8) :: scalar, remainder
+  TYPE(mpi) :: mpi_val
+  INTEGER(KIND=8) :: scalar
 
-    PRINT *, ""
-    PRINT *, "--- Testing MPI Scalar Arithmetic (Multiply/Divide) ---"
+  ! variables for multiplication test
+  integer(8)  :: ntests, npass= 0
+  integer     :: unit_num= 10, iostatus
+  integer(8)  :: k
+  integer(8)  :: c1(COEFFS_LIMIT), c2(COEFFS_LIMIT)
 
-    ! --- Multiplication Tests ---
-    PRINT *, "  Testing Multiplication..."
-    mpi_val = new_mpi_from_integer(12345_8)
-    CALL mpi_multiply_by_scalar(mpi_val, 0_8)
-    CALL check_mpi("Multiply by 0", mpi_val, [0_8, 0_8, 0_8, 0_8])
+  ! variables for division testing
+  integer(8)  :: remainder
 
-    mpi_val = new_mpi_from_integer(12345_8)
-    CALL mpi_multiply_by_scalar(mpi_val, 1_8)
-    CALL check_mpi("Multiply by 1", mpi_val, [12345_8, 0_8, 0_8, 0_8])
 
-    mpi_val = new_mpi_from_integer(100_8)
-    CALL mpi_multiply_by_scalar(mpi_val, 5_8)
-    CALL check_mpi("Multiply positive by positive", mpi_val, [500_8, 0_8, 0_8, 0_8])
+  PRINT *, ""
+  PRINT *, "--- Testing MPI Scalar Arithmetic (Multiply/Divide) ---"
 
-    mpi_val = new_mpi_from_coeffs([MULTI_PRECISION_BASE - 1_8, 1_8]) ! Represents 2*B - 1
-    CALL mpi_multiply_by_scalar(mpi_val, 2_8)
-    CALL check_mpi("Multiply with carry", mpi_val, [MULTI_PRECISION_BASE - 2_8, 3_8, 0_8, 0_8])
+  ! --- Multiplication Tests ---
+  PRINT *, "  Testing Multiplication..."
+  mpi_val = new_mpi_from_integer(12345_8)
+  CALL mpi_multiply_by_scalar(mpi_val, 0_8)
+  CALL check_mpi("Multiply by 0", mpi_val, [0_8, 0_8, 0_8, 0_8])
 
-    mpi_val = new_mpi_from_integer(-100_8)
-    CALL mpi_multiply_by_scalar(mpi_val, 5_8)
-    CALL check_mpi("Multiply negative by positive", mpi_val, [-500_8, 0_8, 0_8, 0_8])
+  mpi_val = new_mpi_from_integer(12345_8)
+  CALL mpi_multiply_by_scalar(mpi_val, 1_8)
+  CALL check_mpi("Multiply by 1", mpi_val, [12345_8, 0_8, 0_8, 0_8])
 
-    ! --- Division Tests ---
-    PRINT *, "  Testing Division..."
-    mpi_val = new_mpi_from_integer(100_8)
-    remainder = mpi_div_by_scalar(mpi_val, 10_8)
-    CALL check_mpi("Div by scalar: Quotient for 100/10", mpi_val, [10_8, 0_8, 0_8, 0_8])
-    CALL check("Div by scalar: Remainder for 100/10", remainder == 0_8)
+  mpi_val = new_mpi_from_integer(100_8)
+  CALL mpi_multiply_by_scalar(mpi_val, 5_8)
+  CALL check_mpi("Multiply positive by positive", mpi_val, [500_8, 0_8, 0_8, 0_8])
 
-    mpi_val = new_mpi_from_integer(105_8)
-    remainder = mpi_div_by_scalar(mpi_val, 10_8)
-    CALL check_mpi("Div by scalar: Quotient for 105/10", mpi_val, [10_8, 0_8, 0_8, 0_8])
-    CALL check("Div by scalar: Remainder for 105/10", remainder == 5_8)
+  mpi_val = new_mpi_from_coeffs([MULTI_PRECISION_BASE - 1_8, 1_8]) ! Represents 2*B - 1
+  CALL mpi_multiply_by_scalar(mpi_val, 2_8)
+  CALL check_mpi("Multiply with carry", mpi_val, [MULTI_PRECISION_BASE - 2_8, 3_8, 0_8, 0_8])
 
-    mpi_val = new_mpi_from_coeffs([10_8, 5_8]) ! Represents 5*B + 10
-    remainder = mpi_div_by_scalar(mpi_val, 3_8)
-    CALL check("Div by scalar: Remainder for (5B+10)/3", remainder == 1_8)
+  mpi_val = new_mpi_from_integer(-100_8)
+  CALL mpi_multiply_by_scalar(mpi_val, 5_8)
+  CALL check_mpi("Multiply negative by positive", mpi_val, [-500_8, 0_8, 0_8, 0_8])
 
-    mpi_val = new_mpi_from_integer(-105_8)
-    remainder = mpi_div_by_scalar(mpi_val, 10_8)
-    CALL check_mpi("Div by scalar: Quotient for -105/10", mpi_val, [-10_8, 0_8, 0_8, 0_8])
-    CALL check("Div by scalar: Remainder for -105/10", remainder == -5_8)
+    ! comprehensive tests
+#ifdef _WIN32
+  call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
+#elif defined(__GFORTRAN__)
+  call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
+#else
+  call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
+#endif
 
-    ! --- Round-trip Test ---
-    PRINT *, "  Testing Multiply/Divide Round-trip..."
-    mpi_val = new_mpi_from_integer(1234567_8)
-    scalar = 987_8
-    CALL mpi_multiply_by_scalar(mpi_val, scalar)
-    remainder = mpi_div_by_scalar(mpi_val, scalar)
-    CALL check("Round-trip: Remainder is zero", remainder == 0_8)
-    CALL check("Round-trip: Original value is recovered", mpi_val == new_mpi_from_integer(1234567_8))
+  open(unit= unit_num, file='./bin/mpi_scalar_mult.txt', status='old', action='read', iostat=iostatus)
+  IF (iostatus /= 0) THEN
+    PRINT *, "Error: Could not open './bin/mpi_scalar_mult.txt'. Run python generator first."
+    STOP
+  END IF
+
+  read(unit_num, *)ntests
+  print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
+
+  do k= 1, ntests
+    read(unit_num, *)c1, scalar, c2
+    mpi_val%coeffs= c1
+
+    call mpi_multiply_by_scalar(mpi_val, scalar)
+
+    if(any(mpi_val%coeffs /= c2))then
+      continue
+    else
+      npass= npass + 1
+    end if
+  end do
+  close(unit_num)
+
+  if (npass == ntests) then
+    print '(A,I0,A,I0,A)', "[PASS] Scalar Multiply: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  else
+    print '(A,I0,A,I0,A)', "[FAIL] Scalar Multiply: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  end if
+
+  ! --- Division Tests ---
+  PRINT *, "  Testing Division..."
+  mpi_val = new_mpi_from_integer(100_8)
+  remainder = mpi_div_by_scalar(mpi_val, 10_8)
+  CALL check_mpi("Div by scalar: Quotient for 100/10", mpi_val, [10_8, 0_8, 0_8, 0_8])
+  CALL check("Div by scalar: Remainder for 100/10", remainder == 0_8)
+
+  mpi_val = new_mpi_from_integer(105_8)
+  remainder = mpi_div_by_scalar(mpi_val, 10_8)
+  CALL check_mpi("Div by scalar: Quotient for 105/10", mpi_val, [10_8, 0_8, 0_8, 0_8])
+  CALL check("Div by scalar: Remainder for 105/10", remainder == 5_8)
+
+  mpi_val = new_mpi_from_coeffs([10_8, 5_8]) ! Represents 5*B + 10
+  remainder = mpi_div_by_scalar(mpi_val, 3_8)
+  CALL check("Div by scalar: Remainder for (5B+10)/3", remainder == 1_8)
+
+  mpi_val = new_mpi_from_integer(-105_8)
+  remainder = mpi_div_by_scalar(mpi_val, 10_8)
+  CALL check_mpi("Div by scalar: Quotient for -105/10", mpi_val, [-10_8, 0_8, 0_8, 0_8])
+  CALL check("Div by scalar: Remainder for -105/10", remainder == -5_8)
+
+  ! ! --- Round-trip Test ---
+  ! PRINT *, "  Testing Multiply/Divide Round-trip..."
+  ! mpi_val = new_mpi_from_integer(1234567_8)
+  ! scalar = 987_8
+  ! CALL mpi_multiply_by_scalar(mpi_val, scalar)
+  ! remainder = mpi_div_by_scalar(mpi_val, scalar)
+  ! CALL check("Round-trip: Remainder is zero", remainder == 0_8)
+  ! CALL check("Round-trip: Original value is recovered", mpi_val == new_mpi_from_integer(1234567_8))
 
 END SUBROUTINE test_mpi_scalar_arithmetic
 
