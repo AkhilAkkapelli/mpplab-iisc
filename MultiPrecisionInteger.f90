@@ -10,7 +10,6 @@ MODULE multi_precision_integer_mod
   END TYPE mpi
 
 
-
   INTERFACE OPERATOR(+)
     MODULE PROCEDURE mpi_add
   END INTERFACE
@@ -35,24 +34,40 @@ MODULE multi_precision_integer_mod
             OPERATOR(+), OPERATOR(-), OPERATOR(*), OPERATOR(==), OPERATOR(<)
 CONTAINS
 
-  PURE SUBROUTINE normalize_mpi(mpi_val)
+  SUBROUTINE normalize_mpi(mpi_val)
     TYPE(mpi), INTENT(INOUT) :: mpi_val
 
     INTEGER(KIND=8) :: carry, current_coeff_val
-    INTEGER :: i
+    INTEGER :: i, msb_idx, sign
+
+    IF(mpi_is_zero(mpi_val)) RETURN
 
     carry = 0_8
-    DO i = 1, SIZE(mpi_val%coeffs)
+    DO i = 1, COEFFS_LIMIT
       current_coeff_val = mpi_val%coeffs(i) + carry
-
       carry = current_coeff_val / MULTI_PRECISION_BASE
       mpi_val%coeffs(i) = current_coeff_val - carry * MULTI_PRECISION_BASE
+      IF (mpi_val%coeffs(i) /= 0_8) msb_idx = i
+    END DO
 
+    IF(carry /= 0_8) print*, "overflow"
+
+    IF (mpi_val%coeffs(msb_idx) > 0_8) THEN
+      sign = 1_8
+    ELSE
+      sign = -1_8
+    END IF
+
+    DO i = 1, msb_idx - 1
+      IF (sign * mpi_val%coeffs(i) < 0_8) THEN
+        mpi_val%coeffs(i+1) = mpi_val%coeffs(i+1) - sign
+        mpi_val%coeffs(i) = mpi_val%coeffs(i) + sign * MULTI_PRECISION_BASE
+      END IF
     END DO
 
   END SUBROUTINE normalize_mpi
 
-  PURE FUNCTION new_mpi_from_coeffs(coeffs) RESULT(mpi_out)
+  FUNCTION new_mpi_from_coeffs(coeffs) RESULT(mpi_out)
     INTEGER(KIND=8), INTENT(IN) :: coeffs(:)
     TYPE(mpi) :: mpi_out
     INTEGER :: n
@@ -66,7 +81,7 @@ CONTAINS
 
   END FUNCTION new_mpi_from_coeffs
 
-  PURE FUNCTION new_mpi_from_integer(x_in) RESULT(mpi_out)
+  FUNCTION new_mpi_from_integer(x_in) RESULT(mpi_out)
     INTEGER(KIND=8), INTENT(IN)   :: x_in
     TYPE(mpi)                     :: mpi_out
 
@@ -91,7 +106,7 @@ CONTAINS
     
   END FUNCTION new_mpi_from_integer
 
-  PURE FUNCTION mpi_to_integer(mpi_in) RESULT(x)
+  FUNCTION mpi_to_integer(mpi_in) RESULT(x)
     TYPE(mpi), INTENT(IN) :: mpi_in
     INTEGER(KIND=8)         :: x
 
@@ -105,7 +120,7 @@ CONTAINS
     x = mpi_in%coeffs(1) + ISHFT(mpi_in%coeffs(2), 32)
   END FUNCTION mpi_to_integer
 
-  PURE SUBROUTINE mpi_multiply_by_scalar(mpi_val, scalar)
+  SUBROUTINE mpi_multiply_by_scalar(mpi_val, scalar)
     TYPE(mpi), INTENT(INOUT) :: mpi_val
     INTEGER(KIND=8), INTENT(IN)   :: scalar
 
@@ -339,6 +354,7 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
     TYPE(mpi), INTENT(IN) :: mpi_val
     LOGICAL :: is_negative
     INTEGER :: i
+    
     is_negative = .FALSE.
     DO i = COEFFS_LIMIT, 1, -1
       IF (mpi_val%coeffs(i) /= 0_8) THEN
@@ -353,7 +369,6 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
     INTEGER :: size_val
     INTEGER :: i
 
-    size_val = 0
     DO i = COEFFS_LIMIT, 1, -1
       IF (mpi_in%coeffs(i) /= 0_8) THEN
         size_val = i
@@ -374,15 +389,44 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
     TYPE(mpi), INTENT(IN) :: a, b
     LOGICAL :: res
 
-    res = mpi_is_zero(a - b)
+    res = ALL(a%coeffs == b%coeffs)
   END FUNCTION mpi_equal
 
   FUNCTION mpi_less(a, b) RESULT(res)
     TYPE(mpi), INTENT(IN) :: a, b
     LOGICAL :: res
-    TYPE(mpi) :: diff
-    diff = b - a 
-    res = (.NOT. mpi_is_zero(diff)) .AND. (.NOT. mpi_sign(diff))
+
+    LOGICAL :: mpi_sign_a
+    INTEGER :: len_a, len_b, i
+    INTEGER(KIND=8) :: c1, c2
+
+    res = .FALSE.
+
+    mpi_sign_a = mpi_sign(a)
+    IF (mpi_sign_a /= mpi_sign(b)) THEN
+      IF(mpi_sign_a) res = .TRUE.
+      RETURN
+    END IF
+
+    IF (mpi_equal(a, b)) RETURN
+
+    len_a = mpi_size(a)
+    len_b = mpi_size(b)
+
+    IF (len_a /= len_b) THEN
+      res = (mpi_sign_a .NEQV. (len_a < len_b))
+      RETURN
+    END IF
+
+    DO i = len_a, 1, -1
+      c1 = ABS(a%coeffs(i))
+      c2 = ABS(b%coeffs(i))
+      IF (c1 /= c2) THEN
+        res = (mpi_sign_a .NEQV. (c1 < c2))
+        RETURN
+      END IF
+    END DO
+
   END FUNCTION mpi_less
 
   FUNCTION mpi_unary_negate(a) RESULT(res)
@@ -488,7 +532,7 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
     END IF
 
     IF (is_negative) THEN
-        temp_mpi = -mpi_in ! Correctly get magnitude of negative number
+        temp_mpi = -mpi_in
     ELSE
         temp_mpi = mpi_in
     END IF
