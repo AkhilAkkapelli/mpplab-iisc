@@ -19,4 +19,3 @@ $(EXE): $(SRC)
 
 clean:
 	rm -f $(EXE)
-

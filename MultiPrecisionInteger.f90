@@ -42,7 +42,7 @@ CONTAINS
     INTEGER :: i
 
     carry = 0_8
-    DO i = 1, SIZE(mpi_val%coeffs)
+    DO i = 1, COEFFS_LIMIT
       current_coeff_val = mpi_val%coeffs(i) + carry
 
       carry = current_coeff_val / MULTI_PRECISION_BASE
