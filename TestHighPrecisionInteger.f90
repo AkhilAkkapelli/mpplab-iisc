@@ -8,7 +8,8 @@ PROGRAM test_mpi
   ! CALL test_new_mpi_from_coeffs()
   ! CALL test_new_mpi_from_integer()
   ! CALL test_mpi_to_integer()
-  CALL test_mpi_scalar_arithmetic()
+  ! CALL test_mpi_scalar_mult()
+  call test_mpi_scalar_div()
   ! CALL test_string_conversions_edge_cases()
   ! CALL test_arithmetic_operators()
   ! CALL test_large_string_conversion()
@@ -118,7 +119,7 @@ SUBROUTINE test_normalization()
   ! generate test_files!
 #ifdef _WIN32
   call execute_command_line("python ./tests/mpi_normalization.py", wait=.true.)
-#elif defined(__GFORTRAN__)
+#elif defined(__GFORTRAN__) && !defined(__linux__)
   call execute_command_line("python ./tests/mpi_normalization.py", wait=.true.)
 #else
   call execute_command_line("python3 ./tests/mpi_normalization.py", wait=.true.)
@@ -205,7 +206,7 @@ SUBROUTINE test_new_mpi_from_coeffs()
     ! generate test_files!
 #ifdef _WIN32
   call execute_command_line("python ./tests/mpi_from_coeffs.py", wait=.true.)
-#elif defined(__GFORTRAN__)
+#elif defined(__GFORTRAN__) && !defined(__linux__)
   call execute_command_line("python ./tests/mpi_from_coeffs.py", wait=.true.)
 #else
   call execute_command_line("python3 ./tests/mpi_from_coeffs.py", wait=.true.)
@@ -299,7 +300,7 @@ SUBROUTINE test_new_mpi_from_integer()
     ! generate test_files!
 #ifdef _WIN32
   call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
-#elif defined(__GFORTRAN__)
+#elif defined(__GFORTRAN__) && !defined(__linux__)
   call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
 #else
   call execute_command_line("python3 ./tests/mpi_from_int.py", wait=.true.)
@@ -393,7 +394,7 @@ SUBROUTINE test_mpi_to_integer()
     ! generate test_files!
 #ifdef _WIN32
   call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
-#elif defined(__GFORTRAN__)
+#elif defined(__GFORTRAN__) && !defined(__linux__)
   call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
 #else
   call execute_command_line("python3 ./tests/mpi_from_int.py", wait=.true.)
@@ -436,7 +437,7 @@ SUBROUTINE test_mpi_to_integer()
 
 END SUBROUTINE test_mpi_to_integer
 
-SUBROUTINE test_mpi_scalar_arithmetic()
+SUBROUTINE test_mpi_scalar_mult()
   TYPE(mpi) :: mpi_val
   INTEGER(KIND=8) :: scalar
 
@@ -445,10 +446,6 @@ SUBROUTINE test_mpi_scalar_arithmetic()
   integer     :: unit_num= 10, iostatus
   integer(8)  :: k
   integer(8)  :: c1(COEFFS_LIMIT), c2(COEFFS_LIMIT)
-
-  ! variables for division testing
-  integer(8)  :: remainder
-
 
   PRINT *, ""
   PRINT *, "--- Testing MPI Scalar Arithmetic (Multiply/Divide) ---"
@@ -475,10 +472,10 @@ SUBROUTINE test_mpi_scalar_arithmetic()
   CALL mpi_multiply_by_scalar(mpi_val, 5_8)
   CALL check_mpi("Multiply negative by positive", mpi_val, [-500_8, 0_8, 0_8, 0_8])
 
-    ! comprehensive tests
+  ! comprehensive tests
 #ifdef _WIN32
   call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#elif defined(__GFORTRAN__)
+#elif defined(__GFORTRAN__) && !defined(__linux__)
   call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
 #else
   call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
@@ -513,6 +510,28 @@ SUBROUTINE test_mpi_scalar_arithmetic()
     print '(A,I0,A,I0,A)', "[FAIL] Scalar Multiply: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
   end if
 
+  ! ! --- Round-trip Test ---
+  ! PRINT *, "  Testing Multiply/Divide Round-trip..."
+  ! mpi_val = new_mpi_from_integer(1234567_8)
+  ! scalar = 987_8
+  ! CALL mpi_multiply_by_scalar(mpi_val, scalar)
+  ! remainder = mpi_div_by_scalar(mpi_val, scalar)
+  ! CALL check("Round-trip: Remainder is zero", remainder == 0_8)
+  ! CALL check("Round-trip: Original value is recovered", mpi_val == new_mpi_from_integer(1234567_8))
+
+END SUBROUTINE test_mpi_scalar_mult
+
+subroutine test_mpi_scalar_div()
+  TYPE(mpi) :: mpi_val
+  INTEGER(KIND=8) :: scalar, remainder
+
+  ! variables for multiplication test
+  integer(8)  :: ntests, npass= 0
+  integer     :: unit_num= 10, iostatus
+  integer(8)  :: k
+  integer(8)  :: c1(COEFFS_LIMIT), c2(COEFFS_LIMIT)
+
+
   ! --- Division Tests ---
   PRINT *, "  Testing Division..."
   mpi_val = new_mpi_from_integer(100_8)
@@ -534,118 +553,147 @@ SUBROUTINE test_mpi_scalar_arithmetic()
   CALL check_mpi("Div by scalar: Quotient for -105/10", mpi_val, [-10_8, 0_8, 0_8, 0_8])
   CALL check("Div by scalar: Remainder for -105/10", remainder == -5_8)
 
-  ! ! --- Round-trip Test ---
-  ! PRINT *, "  Testing Multiply/Divide Round-trip..."
-  ! mpi_val = new_mpi_from_integer(1234567_8)
-  ! scalar = 987_8
-  ! CALL mpi_multiply_by_scalar(mpi_val, scalar)
-  ! remainder = mpi_div_by_scalar(mpi_val, scalar)
-  ! CALL check("Round-trip: Remainder is zero", remainder == 0_8)
-  ! CALL check("Round-trip: Original value is recovered", mpi_val == new_mpi_from_integer(1234567_8))
+  ! comprehensive tests
+#ifdef _WIN32
+  call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
+#elif defined(__GFORTRAN__) && !defined(__linux__)
+  call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
+#else
+  call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
+#endif
 
-END SUBROUTINE test_mpi_scalar_arithmetic
+  open(unit= unit_num, file='./bin/mpi_scalar_mult.txt', status='old', action='read', iostat=iostatus)
+  IF (iostatus /= 0) THEN
+    PRINT *, "Error: Could not open './bin/mpi_scalar_mult.txt'. Run python generator first."
+    STOP
+  END IF
+
+  read(unit_num, *)ntests
+  print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
+
+  do k= 1, ntests
+    read(unit_num, *)c1, scalar, c2
+    mpi_val%coeffs= c2
+
+    remainder= mpi_div_by_scalar(mpi_val, scalar)
+
+    if(any(mpi_val%coeffs /= c1))then
+      continue
+    else
+      npass= npass + 1
+    end if
+  end do
+  close(unit_num)
+
+  if (npass == ntests) then
+    print '(A,I0,A,I0,A)', "[PASS] Scalar Division: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  else
+    print '(A,I0,A,I0,A)', "[FAIL] Scalar Division: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  end if
+end subroutine test_mpi_scalar_div
+
+
 
 SUBROUTINE test_string_conversions_edge_cases()
-    TYPE(mpi) :: mpi_val
-    CHARACTER(LEN=:), ALLOCATABLE :: str_val
+  TYPE(mpi) :: mpi_val
+  CHARACTER(LEN=:), ALLOCATABLE :: str_val
 
-    PRINT *, ""
-    PRINT *, "--- Testing String Conversion Edge Cases ---"
+  PRINT *, ""
+  PRINT *, "--- Testing String Conversion Edge Cases ---"
 
-    ! Test leading/trailing spaces
-    CALL new_mpi_from_string("  123  ", mpi_val)
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("String Edge Case: Leading/trailing spaces", str_val, "123")
+  ! Test leading/trailing spaces
+  CALL new_mpi_from_string("  123  ", mpi_val)
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("String Edge Case: Leading/trailing spaces", str_val, "123")
 
-    ! Test explicit positive sign
-    CALL new_mpi_from_string("+456", mpi_val)
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("String Edge Case: Explicit positive sign", str_val, "456")
+  ! Test explicit positive sign
+  CALL new_mpi_from_string("+456", mpi_val)
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("String Edge Case: Explicit positive sign", str_val, "456")
 
-    ! Test leading zeros
-    CALL new_mpi_from_string("000789", mpi_val)
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("String Edge Case: Leading zeros", str_val, "789")
+  ! Test leading zeros
+  CALL new_mpi_from_string("000789", mpi_val)
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("String Edge Case: Leading zeros", str_val, "789")
 
-    ! Test negative with leading zeros
-    CALL new_mpi_from_string("-00789", mpi_val)
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("String Edge Case: Negative with leading zeros", str_val, "-789")
+  ! Test negative with leading zeros
+  CALL new_mpi_from_string("-00789", mpi_val)
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("String Edge Case: Negative with leading zeros", str_val, "-789")
 
-    ! Test string containing only zeros
-    CALL new_mpi_from_string("000", mpi_val)
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("String Edge Case: Only zeros", str_val, "0")
+  ! Test string containing only zeros
+  CALL new_mpi_from_string("000", mpi_val)
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("String Edge Case: Only zeros", str_val, "0")
 
-    ! Test empty string
-    CALL new_mpi_from_string("", mpi_val)
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("String Edge Case: Empty string", str_val, "0")
-
+  ! Test empty string
+  CALL new_mpi_from_string("", mpi_val)
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("String Edge Case: Empty string", str_val, "0")
 END SUBROUTINE test_string_conversions_edge_cases
 
 SUBROUTINE test_arithmetic_operators()
-    TYPE(mpi) :: a, b, c, expected_mpi
+  TYPE(mpi) :: a, b, c, expected_mpi
 
-    PRINT *, ""
-    PRINT *, "--- Testing Arithmetic Operators ---"
+  PRINT *, ""
+  PRINT *, "--- Testing Arithmetic Operators ---"
 
-    ! --- Addition ---
-    CALL new_mpi_from_string("100", a)
-    CALL new_mpi_from_string("200", b)
-    c = a + b
-    CALL new_mpi_from_string("300", expected_mpi)
-    CALL check_mpi("Addition: 100 + 200", c, expected_mpi%coeffs)
+  ! --- Addition ---
+  CALL new_mpi_from_string("100", a)
+  CALL new_mpi_from_string("200", b)
+  c = a + b
+  CALL new_mpi_from_string("300", expected_mpi)
+  CALL check_mpi("Addition: 100 + 200", c, expected_mpi%coeffs)
 
-    CALL new_mpi_from_string("-100", a)
-    CALL new_mpi_from_string("50", b)
-    c = a + b
-    CALL new_mpi_from_string("-50", expected_mpi)
-    CALL check_mpi("Addition: -100 + 50", c, expected_mpi%coeffs)
+  CALL new_mpi_from_string("-100", a)
+  CALL new_mpi_from_string("50", b)
+  c = a + b
+  CALL new_mpi_from_string("-50", expected_mpi)
+  CALL check_mpi("Addition: -100 + 50", c, expected_mpi%coeffs)
 
-    CALL new_mpi_from_string("10633823966279326983230400083533428776", a) 
-    CALL new_mpi_from_string("2658455991569831745809959798659454619", b)
-    c = a + b
-    CALL new_mpi_from_string("13292279957849158729040359882192883395", expected_mpi)
-    CALL check_mpi("Addition: Large with carry", c, expected_mpi%coeffs)
+  CALL new_mpi_from_string("10633823966279326983230400083533428776", a) 
+  CALL new_mpi_from_string("2658455991569831745809959798659454619", b)
+  c = a + b
+  CALL new_mpi_from_string("13292279957849158729040359882192883395", expected_mpi)
+  CALL check_mpi("Addition: Large with carry", c, expected_mpi%coeffs)
 
-    ! --- Subtraction ---
-    CALL new_mpi_from_string("300", a)
-    CALL new_mpi_from_string("100", b)
-    c = a - b
-    CALL new_mpi_from_string("200", expected_mpi)
-    CALL check_mpi("Subtraction: 300 - 100", c, expected_mpi%coeffs)
+  ! --- Subtraction ---
+  CALL new_mpi_from_string("300", a)
+  CALL new_mpi_from_string("100", b)
+  c = a - b
+  CALL new_mpi_from_string("200", expected_mpi)
+  CALL check_mpi("Subtraction: 300 - 100", c, expected_mpi%coeffs)
 
-    CALL new_mpi_from_string("50", a)
-    CALL new_mpi_from_string("100", b)
-    c = a - b
-    CALL new_mpi_from_string("-50", expected_mpi)
-    CALL check_mpi("Subtraction: 50 - 100", c, expected_mpi%coeffs)
+  CALL new_mpi_from_string("50", a)
+  CALL new_mpi_from_string("100", b)
+  c = a - b
+  CALL new_mpi_from_string("-50", expected_mpi)
+  CALL check_mpi("Subtraction: 50 - 100", c, expected_mpi%coeffs)
 
-    ! --- Multiplication ---
-    CALL new_mpi_from_string("-2305842971231290661", a)
-    CALL new_mpi_from_string("4614031696526153371", b)
-    c = a * b
-    print*, "mult: ", mpi_to_string(c)
-    CALL new_mpi_from_string("-10639232556473218309152790657965968231", expected_mpi)
-    CALL check_mpi("Multiplication: 1000 * 2000", c, expected_mpi%coeffs)
+  ! --- Multiplication ---
+  CALL new_mpi_from_string("-2305842971231290661", a)
+  CALL new_mpi_from_string("4614031696526153371", b)
+  c = a * b
+  print*, "mult: ", mpi_to_string(c)
+  CALL new_mpi_from_string("-10639232556473218309152790657965968231", expected_mpi)
+  CALL check_mpi("Multiplication: 1000 * 2000", c, expected_mpi%coeffs)
 
 END SUBROUTINE test_arithmetic_operators
 
 SUBROUTINE test_large_string_conversion()
-    TYPE(mpi) :: mpi_val
-    CHARACTER(LEN=:), ALLOCATABLE :: str_val
-    CHARACTER(LEN=100) :: expected_str
+  TYPE(mpi) :: mpi_val
+  CHARACTER(LEN=:), ALLOCATABLE :: str_val
+  CHARACTER(LEN=100) :: expected_str
 
-    PRINT *, ""
-    PRINT *, "--- Testing Large String Conversion ---"
+  PRINT *, ""
+  PRINT *, "--- Testing Large String Conversion ---"
 
-    expected_str = "-1329227995784915872903806277077091289" 
+  expected_str = "-1329227995784915872903806277077091289" 
 
-    CALL new_mpi_from_string(expected_str, mpi_val)
-    CALL check_mpi("From String: ", mpi_val, [-2775761881_8, -4294967113_8, -4294967295_8, -16777215_8])
-    str_val = mpi_to_string(mpi_val)
-    CALL check_string("To String: ", str_val, expected_str)
+  CALL new_mpi_from_string(expected_str, mpi_val)
+  CALL check_mpi("From String: ", mpi_val, [-2775761881_8, -4294967113_8, -4294967295_8, -16777215_8])
+  str_val = mpi_to_string(mpi_val)
+  CALL check_string("To String: ", str_val, expected_str)
 END SUBROUTINE test_large_string_conversion
 
 END PROGRAM test_mpi

@@ -52,7 +52,7 @@ SUBROUTINE normalize_mpi(mpi_val)
     IF (mpi_val%coeffs(i) /= 0_8) msb_idx = i
   END DO
 
-  IF(carry /= 0_8) print*, "overflow"
+  IF(carry /= 0_8) print*, "overflow in normalize_mpi"
 
   IF (mpi_val%coeffs(msb_idx) > 0_8) THEN
     sign = 1_8
@@ -163,7 +163,7 @@ SUBROUTINE mpi_multiply_by_scalar(mpi_val, scalar)
     ! carry= prod/MULTI_PRECISION_BASE
     carry = ISHFT(prod, -32)
   END DO
-
+  if (carry /= 0_8) print *, "Overflow in mpi_multiply_by_scalar!"
   ! ! resolve final sign
   mpi_val%coeffs= mpi_val%coeffs*sign_mpi*sign_scl
 END SUBROUTINE mpi_multiply_by_scalar
@@ -177,12 +177,35 @@ FUNCTION mpi_div_by_scalar(mpi_val, divisor) RESULT(remainder)
   INTEGER(KIND=8) :: current_val
   INTEGER :: i
 
+  ! sign reslution variables
+  integer(kind=8)               :: sign_info_pos, sign_info_neg
+  integer(kind=8)               :: sign_mpi
+  integer(kind=8)               :: sign_scl, abs_scl
+
+  ! resolve sign of mpi_val
+  sign_info_pos= merge(1, 0, all(mpi_val%coeffs >= 0_8)) 
+  sign_info_neg= merge(1, 0, all(mpi_val%coeffs <= 0_8)) 
+  if (.not.(sign_info_pos == 1 .or. sign_info_neg == 1))then
+    print *, "Provide valid MPI Value!"
+    stop
+  end if
+  sign_mpi = sign_info_pos - sign_info_neg
+  mpi_val%coeffs= abs(mpi_val%coeffs)
+
+  ! resolve sign of scalar
+  sign_scl= merge(1,-1,divisor >= 0_8)
+  abs_scl= abs(divisor)
+
   remainder = 0_8
   DO i = COEFFS_LIMIT, 1, -1
-      current_val = mpi_val%coeffs(i) + ISHFT(remainder, 32)
-      mpi_val%coeffs(i) = current_val / divisor
-      remainder = MODULO(current_val, divisor)
+    current_val = mpi_val%coeffs(i) + ISHFT(remainder, 32)
+    mpi_val%coeffs(i) = current_val / abs_scl
+    remainder = MODULO(current_val, abs_scl)
   END DO
+
+  ! resolve final coefficients
+  mpi_val%coeffs= mpi_val%coeffs*sign_mpi*sign_scl
+  remainder= remainder*sign_mpi
 END FUNCTION mpi_div_by_scalar
 
 FUNCTION mpi_shift_bits_left(mpi_in, num_bits) RESULT(mpi_out)

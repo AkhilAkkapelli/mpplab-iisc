@@ -48,8 +48,8 @@ CONTAINS
 
   FUNCTION new_mpf_from_mpi_exp(mantissa_in, exponent_in) RESULT(mpf_out)
     TYPE(mpi), INTENT(IN)              :: mantissa_in
-    INTEGER, OPTIONAL, INTENT(IN)        :: exponent_in
-    TYPE(mpf)           :: mpf_out
+    INTEGER, OPTIONAL, INTENT(IN)      :: exponent_in
+    TYPE(mpf)                          :: mpf_out
 
     mpf_out%mantissa = mantissa_in
     IF (PRESENT(exponent_in)) THEN
