@@ -3,14 +3,19 @@ PROGRAM test_mpi
   IMPLICIT NONE
 
   INTEGER(KIND=8), PARAMETER :: MASK32 = INT(Z'FFFFFFFF', KIND=8)
+#if defined(_WIN32) || defined(_WIN64)
+  character(len=6),parameter :: python_cmd= 'python'
+#else
+  character(len=7),parameter :: python_cmd= 'python3'
+#endif
 
   ! CALL test_normalization()
   ! CALL test_new_mpi_from_coeffs()
   ! CALL test_new_mpi_from_integer()
   ! CALL test_mpi_to_integer()
   ! CALL test_mpi_scalar_mult()
-  call test_mpi_scalar_div()
-  ! CALL test_string_conversions_edge_cases()
+  ! call test_mpi_scalar_div()
+  CALL test_string_conversions()
   ! CALL test_arithmetic_operators()
   ! CALL test_large_string_conversion()
 CONTAINS
@@ -117,13 +122,7 @@ SUBROUTINE test_normalization()
 
   ! Test 8: Comprehensive Testing
   ! generate test_files!
-#ifdef _WIN32
-  call execute_command_line("python ./tests/mpi_normalization.py", wait=.true.)
-#elif defined(__GFORTRAN__) && !defined(__linux__)
-  call execute_command_line("python ./tests/mpi_normalization.py", wait=.true.)
-#else
-  call execute_command_line("python3 ./tests/mpi_normalization.py", wait=.true.)
-#endif
+  call execute_command_line(python_cmd//" ./tests/mpi_normalization.py", wait=.true.)
 
   OPEN(UNIT=unit_num, FILE='./bin/mpi_normalization_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
   IF (iostatus /= 0) THEN
@@ -164,53 +163,47 @@ SUBROUTINE test_normalization()
 END SUBROUTINE test_normalization
 
 SUBROUTINE test_new_mpi_from_coeffs()
-    TYPE(mpi) :: mpi_val
+  TYPE(mpi) :: mpi_val
 
-    integer::    ntests, npass= 0
-    integer::    unit_num= 10, iostatus, k
-    integer(8) :: expec_coeffs(COEFFS_LIMIT)
-    integer    :: exp_sign
+  integer::    ntests, npass= 0
+  integer::    unit_num= 10, iostatus, k
+  integer(8) :: expec_coeffs(COEFFS_LIMIT)
+  integer    :: exp_sign
 
-    PRINT *, ""
-    PRINT *, "--- Testing new_mpi_from_coeffs ---"
+  PRINT *, ""
+  PRINT *, "--- Testing new_mpi_from_coeffs ---"
 
-    ! Test 1: Simple positive coefficients
-    mpi_val = new_mpi_from_coeffs([123_8, 456_8])
-    CALL check_mpi("From Coeffs: Simple positive", mpi_val, [123_8, 456_8, 0_8, 0_8])
+  ! Test 1: Simple positive coefficients
+  mpi_val = new_mpi_from_coeffs([123_8, 456_8])
+  CALL check_mpi("From Coeffs: Simple positive", mpi_val, [123_8, 456_8, 0_8, 0_8])
 
-    ! Test 2: Simple negative coefficients (note: normalize_mpi handles borrows, not sign uniformity)
-    mpi_val = new_mpi_from_coeffs([-123_8, -456_8])
-    CALL check_mpi("From Coeffs: Simple negative", mpi_val, [-123_8, -456_8, 0_8, 0_8])
+  ! Test 2: Simple negative coefficients (note: normalize_mpi handles borrows, not sign uniformity)
+  mpi_val = new_mpi_from_coeffs([-123_8, -456_8])
+  CALL check_mpi("From Coeffs: Simple negative", mpi_val, [-123_8, -456_8, 0_8, 0_8])
 
-    ! Test 3: Coefficients requiring normalization (carry)
-    mpi_val = new_mpi_from_coeffs([MULTI_PRECISION_BASE + 10_8, 1_8])
-    CALL check_mpi("From Coeffs: With positive normalization (carry)", mpi_val, [10_8, 2_8, 0_8, 0_8])
+  ! Test 3: Coefficients requiring normalization (carry)
+  mpi_val = new_mpi_from_coeffs([MULTI_PRECISION_BASE + 10_8, 1_8])
+  CALL check_mpi("From Coeffs: With positive normalization (carry)", mpi_val, [10_8, 2_8, 0_8, 0_8])
 
-    ! Test 4: Empty coefficient array
-    mpi_val = new_mpi_from_coeffs(coeffs=[INTEGER(KIND=8) ::])
-    CALL check_mpi("From Coeffs: Empty input", mpi_val, [0_8, 0_8, 0_8, 0_8])
+  ! Test 4: Empty coefficient array
+  mpi_val = new_mpi_from_coeffs(coeffs=[INTEGER(KIND=8) ::])
+  CALL check_mpi("From Coeffs: Empty input", mpi_val, [0_8, 0_8, 0_8, 0_8])
 
-    ! Test 5: Single coefficient
-    mpi_val = new_mpi_from_coeffs([999_8])
-    CALL check_mpi("From Coeffs: Single coefficient", mpi_val, [999_8, 0_8, 0_8, 0_8])
+  ! Test 5: Single coefficient
+  mpi_val = new_mpi_from_coeffs([999_8])
+  CALL check_mpi("From Coeffs: Single coefficient", mpi_val, [999_8, 0_8, 0_8, 0_8])
 
-    ! Test 6: Full coefficient array
-    mpi_val = new_mpi_from_coeffs([1_8, 2_8, 3_8, 4_8])
-    CALL check_mpi("From Coeffs: Full array", mpi_val, [1_8, 2_8, 3_8, 4_8])
+  ! Test 6: Full coefficient array
+  mpi_val = new_mpi_from_coeffs([1_8, 2_8, 3_8, 4_8])
+  CALL check_mpi("From Coeffs: Full array", mpi_val, [1_8, 2_8, 3_8, 4_8])
 
-    ! Test 7: Coefficients that normalize to zero
-    mpi_val = new_mpi_from_coeffs([-MULTI_PRECISION_BASE, 1_8])
-    CALL check_mpi("From Coeffs: Normalization to zero", mpi_val, [0_8, 0_8, 0_8, 0_8])
+  ! Test 7: Coefficients that normalize to zero
+  mpi_val = new_mpi_from_coeffs([-MULTI_PRECISION_BASE, 1_8])
+  CALL check_mpi("From Coeffs: Normalization to zero", mpi_val, [0_8, 0_8, 0_8, 0_8])
 
-    ! Test 8: Comprehensive testing
-    ! generate test_files!
-#ifdef _WIN32
-  call execute_command_line("python ./tests/mpi_from_coeffs.py", wait=.true.)
-#elif defined(__GFORTRAN__) && !defined(__linux__)
-  call execute_command_line("python ./tests/mpi_from_coeffs.py", wait=.true.)
-#else
-  call execute_command_line("python3 ./tests/mpi_from_coeffs.py", wait=.true.)
-#endif
+  ! Test 8: Comprehensive testing
+  ! generate test_files!
+  call execute_command_line(python_cmd//" ./tests/mpi_from_coeffs.py", wait=.true.)
 
   OPEN(UNIT=unit_num, FILE='./bin/mpi_from_coeffs_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
   IF (iostatus /= 0) THEN
@@ -249,62 +242,56 @@ SUBROUTINE test_new_mpi_from_coeffs()
 END SUBROUTINE test_new_mpi_from_coeffs
 
 SUBROUTINE test_new_mpi_from_integer()
-    TYPE(mpi) :: mpi_val
-    INTEGER(KIND=8) :: int_val
+  TYPE(mpi) :: mpi_val
+  INTEGER(KIND=8) :: int_val
 
-    integer::    ntests, npass= 0
-    integer::    unit_num= 10, iostatus, k
-    integer(8) :: expec_coeffs(COEFFS_LIMIT)
+  integer::    ntests, npass= 0
+  integer::    unit_num= 10, iostatus, k
+  integer(8) :: expec_coeffs(COEFFS_LIMIT)
 
-    PRINT *, ""
-    PRINT *, "--- Testing new_mpi_from_integer ---"
+  PRINT *, ""
+  PRINT *, "--- Testing new_mpi_from_integer ---"
 
-    ! Test 1: Zero
-    mpi_val = new_mpi_from_integer(0_8)
-    CALL check_mpi("From Integer: 0", mpi_val, [0_8, 0_8, 0_8, 0_8])
+  ! Test 1: Zero
+  mpi_val = new_mpi_from_integer(0_8)
+  CALL check_mpi("From Integer: 0", mpi_val, [0_8, 0_8, 0_8, 0_8])
 
-    ! Test 2: Small positive
-    mpi_val = new_mpi_from_integer(12345_8)
-    CALL check_mpi("From Integer: Small positive", mpi_val, [12345_8, 0_8, 0_8, 0_8])
+  ! Test 2: Small positive
+  mpi_val = new_mpi_from_integer(12345_8)
+  CALL check_mpi("From Integer: Small positive", mpi_val, [12345_8, 0_8, 0_8, 0_8])
 
-    ! Test 3: Small negative
-    mpi_val = new_mpi_from_integer(-54321_8)
-    CALL check_mpi("From Integer: Small negative", mpi_val, [-54321_8, 0_8, 0_8, 0_8])
+  ! Test 3: Small negative
+  mpi_val = new_mpi_from_integer(-54321_8)
+  CALL check_mpi("From Integer: Small negative", mpi_val, [-54321_8, 0_8, 0_8, 0_8])
 
-    ! Test 4: Positive, crossing one coefficient boundary
-    int_val = MULTI_PRECISION_BASE + 100_8
-    mpi_val = new_mpi_from_integer(int_val)
-    CALL check_mpi("From Integer: Large positive", mpi_val, [100_8, 1_8, 0_8, 0_8])
+  ! Test 4: Positive, crossing one coefficient boundary
+  int_val = MULTI_PRECISION_BASE + 100_8
+  mpi_val = new_mpi_from_integer(int_val)
+  CALL check_mpi("From Integer: Large positive", mpi_val, [100_8, 1_8, 0_8, 0_8])
 
-    ! Test 5: Negative, crossing one coefficient boundary
-    int_val = -(MULTI_PRECISION_BASE + 100_8)
-    mpi_val = new_mpi_from_integer(int_val)
-    CALL check_mpi("From Integer: Large negative", mpi_val, [-100_8, -1_8, 0_8, 0_8])
+  ! Test 5: Negative, crossing one coefficient boundary
+  int_val = -(MULTI_PRECISION_BASE + 100_8)
+  mpi_val = new_mpi_from_integer(int_val)
+  CALL check_mpi("From Integer: Large negative", mpi_val, [-100_8, -1_8, 0_8, 0_8])
 
-    ! Test 6: Maximum 64-bit integer
-    int_val = HUGE(0_8)
-    mpi_val = new_mpi_from_integer(int_val)
-    CALL check_mpi("From Integer: HUGE(0_8)", mpi_val, [MASK32, ISHFT(int_val, -32), 0_8, 0_8])
+  ! Test 6: Maximum 64-bit integer
+  int_val = HUGE(0_8)
+  mpi_val = new_mpi_from_integer(int_val)
+  CALL check_mpi("From Integer: HUGE(0_8)", mpi_val, [MASK32, ISHFT(int_val, -32), 0_8, 0_8])
 
-    ! Test 7: Minimum 64-bit integer
-    int_val = -HUGE(0_8) - 1_8
-    mpi_val = new_mpi_from_integer(int_val)
-    CALL check_mpi("From Integer: Most negative", mpi_val, [0_8, -ISHFT(MULTI_PRECISION_BASE, -1), 0_8, 0_8])
+  ! Test 7: Minimum 64-bit integer
+  int_val = -HUGE(0_8) - 1_8
+  mpi_val = new_mpi_from_integer(int_val)
+  CALL check_mpi("From Integer: Most negative", mpi_val, [0_8, -ISHFT(MULTI_PRECISION_BASE, -1), 0_8, 0_8])
 
-    ! Test 8: Round trip check for a large value
-    int_val = 123456789012345_8
-    mpi_val = new_mpi_from_integer(int_val)
-    CALL check("From/To Integer: Round trip", mpi_to_integer(mpi_val) == int_val)
+  ! Test 8: Round trip check for a large value
+  int_val = 123456789012345_8
+  mpi_val = new_mpi_from_integer(int_val)
+  CALL check("From/To Integer: Round trip", mpi_to_integer(mpi_val) == int_val)
 
-    ! Test 9: Comprehensive Testing
-    ! generate test_files!
-#ifdef _WIN32
-  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
-#elif defined(__GFORTRAN__) && !defined(__linux__)
-  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
-#else
-  call execute_command_line("python3 ./tests/mpi_from_int.py", wait=.true.)
-#endif
+  ! Test 9: Comprehensive Testing
+  ! generate test_files!
+  call execute_command_line(python_cmd//" ./tests/mpi_from_int.py", wait=.true.)
 
   OPEN(UNIT=unit_num, FILE='./bin/mpi_from_int_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
   IF (iostatus /= 0) THEN
@@ -339,72 +326,66 @@ SUBROUTINE test_new_mpi_from_integer()
   end if
 
   PRINT *, ""
-
 END SUBROUTINE test_new_mpi_from_integer
 
 SUBROUTINE test_mpi_to_integer()
-    TYPE(mpi) :: mpi_val
-    INTEGER(KIND=8) :: int_val, exp_val
+  TYPE(mpi) :: mpi_val
+  INTEGER(KIND=8) :: int_val, exp_val
 
-    integer::    ntests, npass= 0
-    integer::    unit_num= 10, iostatus, k
-    integer(8) :: inp_coeffs(COEFFS_LIMIT)
+  integer::    ntests, npass= 0
+  integer::    unit_num= 10, iostatus, k
+  integer(8) :: inp_coeffs(COEFFS_LIMIT)
 
-    PRINT *, ""
-    PRINT *, "--- Testing mpi_to_integer ---"
+  PRINT *, ""
+  PRINT *, "--- Testing mpi_to_integer ---"
 
-    ! Test 1: Zero
-    mpi_val = new_mpi_from_coeffs([0_8, 0_8, 0_8, 0_8])
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: 0", int_val == 0_8)
+  ! Test 1: Zero
+  mpi_val = new_mpi_from_coeffs([0_8, 0_8, 0_8, 0_8])
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: 0", int_val == 0_8)
 
-    ! Test 2: Small positive
-    mpi_val = new_mpi_from_coeffs([12345_8, 0_8, 0_8, 0_8])
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Small positive", int_val == 12345_8)
+  ! Test 2: Small positive
+  mpi_val = new_mpi_from_coeffs([12345_8, 0_8, 0_8, 0_8])
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: Small positive", int_val == 12345_8)
 
-    ! Test 3: Small negative
-    mpi_val = new_mpi_from_coeffs([-54321_8, 0_8, 0_8, 0_8])
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Small negative", int_val == -54321_8)
+  ! Test 3: Small negative
+  mpi_val = new_mpi_from_coeffs([-54321_8, 0_8, 0_8, 0_8])
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: Small negative", int_val == -54321_8)
 
-    ! Test 4: Large positive (two coefficients)
-    exp_val = MULTI_PRECISION_BASE * 2_8 + 123_8
-    mpi_val = new_mpi_from_coeffs([123_8, 2_8, 0_8, 0_8])
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Large positive", int_val == exp_val)
+  ! Test 4: Large positive (two coefficients)
+  exp_val = MULTI_PRECISION_BASE * 2_8 + 123_8
+  mpi_val = new_mpi_from_coeffs([123_8, 2_8, 0_8, 0_8])
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: Large positive", int_val == exp_val)
 
-    ! Test 5: Large negative (two coefficients)
-    exp_val = -(MULTI_PRECISION_BASE * 3_8 + 456_8)
-    mpi_val = new_mpi_from_coeffs([-456_8, -3_8, 0_8, 0_8])
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Large negative", int_val == exp_val)
+  ! Test 5: Large negative (two coefficients)
+  exp_val = -(MULTI_PRECISION_BASE * 3_8 + 456_8)
+  mpi_val = new_mpi_from_coeffs([-456_8, -3_8, 0_8, 0_8])
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: Large negative", int_val == exp_val)
 
-    ! Test 6: Maximum 64-bit integer
-    mpi_val = new_mpi_from_integer(HUGE(0_8))
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: HUGE(0_8)", int_val == HUGE(0_8))
+  ! Test 6: Maximum 64-bit integer
+  mpi_val = new_mpi_from_integer(HUGE(0_8))
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: HUGE(0_8)", int_val == HUGE(0_8))
 
-    ! Test 7: Minimum 64-bit integer
-    mpi_val = new_mpi_from_integer(-HUGE(0_8) - 1_8)
-    int_val = mpi_to_integer(mpi_val)
-    CALL check("To Integer: Most negative", int_val == -HUGE(0_8)-1_8)
+  ! Test 7: Minimum 64-bit integer
+  mpi_val = new_mpi_from_integer(-HUGE(0_8) - 1_8)
+  int_val = mpi_to_integer(mpi_val)
+  CALL check("To Integer: Most negative", int_val == -HUGE(0_8)-1_8)
 
-    ! Test 8: Comprehensive testing
-    ! generate test_files!
-#ifdef _WIN32
-  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
-#elif defined(__GFORTRAN__) && !defined(__linux__)
-  call execute_command_line("python ./tests/mpi_from_int.py", wait=.true.)
-#else
-  call execute_command_line("python3 ./tests/mpi_from_int.py", wait=.true.)
-#endif
+  ! Test 8: Comprehensive testing
+  ! generate test_files!
+  call execute_command_line(python_cmd//" ./tests/mpi_from_int.py", wait=.true.)
 
   OPEN(UNIT=unit_num, FILE='./bin/mpi_from_int_tests.txt', STATUS='OLD', ACTION='READ', IOSTAT=iostatus)
   IF (iostatus /= 0) THEN
     PRINT *, "Error: Could not open './bin/mpi_from_int_tests.txt'. Run python generator first."
     STOP
   END IF
+
   ! read no.of test cases from the file
   read(unit_num, *)ntests
   print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
@@ -434,7 +415,6 @@ SUBROUTINE test_mpi_to_integer()
   end if
 
   PRINT *, ""
-
 END SUBROUTINE test_mpi_to_integer
 
 SUBROUTINE test_mpi_scalar_mult()
@@ -473,13 +453,7 @@ SUBROUTINE test_mpi_scalar_mult()
   CALL check_mpi("Multiply negative by positive", mpi_val, [-500_8, 0_8, 0_8, 0_8])
 
   ! comprehensive tests
-#ifdef _WIN32
-  call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#elif defined(__GFORTRAN__) && !defined(__linux__)
-  call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#else
-  call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#endif
+  call execute_command_line(python_cmd//" ./tests/mpi_scalar_arithmetic.py", wait=.true.)
 
   open(unit= unit_num, file='./bin/mpi_scalar_mult.txt', status='old', action='read', iostat=iostatus)
   IF (iostatus /= 0) THEN
@@ -554,13 +528,7 @@ subroutine test_mpi_scalar_div()
   CALL check("Div by scalar: Remainder for -105/10", remainder == -5_8)
 
   ! comprehensive tests
-#ifdef _WIN32
-  call execute_command_line("python ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#elif defined(__GFORTRAN__) && !defined(__linux__)
-  call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#else
-  call execute_command_line("python3 ./tests/mpi_scalar_arithmetic.py", wait=.true.)
-#endif
+  call execute_command_line(python_cmd//" ./tests/mpi_scalar_arithmetic.py", wait=.true.)
 
   open(unit= unit_num, file='./bin/mpi_scalar_mult.txt', status='old', action='read', iostat=iostatus)
   IF (iostatus /= 0) THEN
@@ -592,11 +560,18 @@ subroutine test_mpi_scalar_div()
   end if
 end subroutine test_mpi_scalar_div
 
-
-
-SUBROUTINE test_string_conversions_edge_cases()
+SUBROUTINE test_string_conversions()
   TYPE(mpi) :: mpi_val
-  CHARACTER(LEN=:), ALLOCATABLE :: str_val
+  CHARACTER(LEN=64) :: str_val
+
+  ! variables for multiplication test
+  integer(8)  :: ntests, npass= 0
+  integer     :: unit_num= 10, iostatus
+  integer(8)  :: k
+  integer(8)  :: c(COEFFS_LIMIT)
+#if defined(__debug)
+  integer(8)  :: i
+#endif
 
   PRINT *, ""
   PRINT *, "--- Testing String Conversion Edge Cases ---"
@@ -630,7 +605,57 @@ SUBROUTINE test_string_conversions_edge_cases()
   CALL new_mpi_from_string("", mpi_val)
   str_val = mpi_to_string(mpi_val)
   CALL check_string("String Edge Case: Empty string", str_val, "0")
-END SUBROUTINE test_string_conversions_edge_cases
+
+  ! comprehensive testing
+  print *, "Python Command being used: ", python_cmd
+  call execute_command_line(python_cmd//" ./tests/mpi_from_string.py", wait=.true.)
+
+  open(unit=unit_num, file="./bin/mpi_from_string_tests.txt", action="read", status="old", iostat=iostatus)
+  IF (iostatus /= 0) THEN
+    PRINT *, "Error: Could not open './bin/mpi_from_string_tests.txt'. Run python generator first."
+    STOP
+  END IF
+
+  read(unit_num, *)ntests
+  print '(A,I0,A)', "Loading ", ntests, " Test Cases from file!"
+
+#if defined(__debug)
+  ntests= 1
+#endif
+
+  do k= 1, ntests
+    read(unit_num, *)str_val, c
+
+#if defined(__debug)
+    write(*, '(A, A)', advance="no")str_val, " "
+    do i= 1, COEFFS_LIMIT
+      write(*, '(I0, A)', advance="no")c(i), " "
+    end do
+    print *,""
+#endif
+  
+    call new_mpi_from_string(str_val, mpi_val)
+#if defined(__debug)
+    do i= 1, COEFFS_LIMIT
+      write(*, '(I0, A)', advance="no")mpi_val%coeffs(i), " "
+    end do
+    print *,""
+#endif
+
+    if(any(mpi_val%coeffs /= c))then
+      continue
+    else
+      npass= npass + 1
+    end if
+  end do
+  close(unit_num)
+
+  if (npass == ntests) then
+    print '(A,I0,A,I0,A)', "[PASS] String Conversion: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  else
+    print '(A,I0,A,I0,A)', "[FAIL] String Conversion: Randomly Generated cases: ", npass, "/", ntests, " cases passed" 
+  end if
+END SUBROUTINE test_string_conversions
 
 SUBROUTINE test_arithmetic_operators()
   TYPE(mpi) :: a, b, c, expected_mpi

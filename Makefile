@@ -3,7 +3,13 @@ FORT_COMP = gfortran
 
 # Source and executable
 SRC = MultiPrecisionInteger.f90 TestHighPrecisionInteger.f90
-EXE = mpl
+ifeq ($(OS), Windows_NT)
+	EXE := mpl.exe
+	FFLAGS := -D_WIN64
+else
+	EXE := mpl
+	FFLAGS := -D__linux__
+endif
 
 # Compiler Flags
 # CFLAGS = -i8 -fp-model precise -O3 -mcmodel=large -qopenmp -qmkl-ilp64  -I/opt/intel/oneapi/mkl/2024.2/include/ -I/opt/intel/oneapi/mkl/2024.2/include/intel64/ilp64/
@@ -15,8 +21,9 @@ EXE = mpl
 all: $(EXE)
 
 $(EXE): $(SRC)
-	$(FORT_COMP) -o $(EXE) $(SRC) -cpp
+	@$(FORT_COMP) $(FFLAGS) -o $(EXE) $(SRC) -cpp
 
 clean:
-	rm -f $(EXE)
+	@rm $(EXE)
+
 

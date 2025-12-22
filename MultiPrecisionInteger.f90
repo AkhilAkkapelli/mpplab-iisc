@@ -224,8 +224,8 @@ FUNCTION mpi_shift_bits_left(mpi_in, num_bits) RESULT(mpi_out)
   END IF
 
   IF (mpi_is_zero(mpi_in)) THEN
-      mpi_out%coeffs = 0_8
-      RETURN
+    mpi_out%coeffs = 0_8
+    RETURN
   END IF
 
   is_negative = mpi_sign(mpi_in)
@@ -242,9 +242,9 @@ FUNCTION mpi_shift_bits_left(mpi_in, num_bits) RESULT(mpi_out)
   
   high_part = 0_8
   DO i = 1, COEFFS_LIMIT - word_shift
-      low_part = IAND(ISHFT(mpi_abs_in%coeffs(i), bit_shift), INT(Z'FFFFFFFF', KIND=8))
-      IF (i + word_shift <= COEFFS_LIMIT) mpi_out%coeffs(i + word_shift) = IOR(low_part, high_part)
-      high_part = ISHFT(ISHFT(mpi_abs_in%coeffs(i), bit_shift), -32)
+    low_part = IAND(ISHFT(mpi_abs_in%coeffs(i), bit_shift), INT(Z'FFFFFFFF', KIND=8))
+    IF (i + word_shift <= COEFFS_LIMIT) mpi_out%coeffs(i + word_shift) = IOR(low_part, high_part)
+    high_part = ISHFT(ISHFT(mpi_abs_in%coeffs(i), bit_shift), -32)
   END DO
 
   IF (is_negative) mpi_out = -mpi_out
@@ -288,16 +288,15 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
   END DO
 
   IF (is_negative) mpi_out = -mpi_out
-    
 END FUNCTION mpi_shift_bits_right
 
 SUBROUTINE mpi_div_rem(numerator, denominator, quotient, remainder)
   TYPE(mpi), INTENT(IN)  :: numerator, denominator
   TYPE(mpi), INTENT(OUT) :: quotient, remainder
 
-  TYPE(mpi)     :: num_abs, den_abs, q_abs, r_abs
-  LOGICAL :: num_is_neg, den_is_neg
-  LOGICAL :: q_is_neg, r_is_neg
+  TYPE(mpi) :: num_abs, den_abs, q_abs, r_abs
+  LOGICAL   :: num_is_neg, den_is_neg
+  LOGICAL   :: q_is_neg, r_is_neg
 
   IF (mpi_is_zero(denominator)) STOP "mpi_div_rem: Division by zero."
 
@@ -349,29 +348,29 @@ CONTAINS
       shifted_den = mpi_scale_up_by_base_power(den, k)
 
       IF (current_rem < shifted_den) THEN
-          q_digit = 0_8
+        q_digit = 0_8
       ELSE
-          low = 1_8
-          high = MULTI_PRECISION_BASE - 1
-          q_digit = 1_8
+        low = 1_8
+        high = MULTI_PRECISION_BASE - 1
+        q_digit = 1_8
 
-          DO WHILE (low <= high)
-              mid = low + ISHFT(high - low, -1)
-              test_prod = new_mpi_from_integer(mid)
-              test_prod = shifted_den * test_prod
-              IF (current_rem < test_prod) THEN
-                  high = mid - 1
-              ELSE
-                  q_digit = mid
-                  low = mid + 1
-              END IF
-          END DO
+        DO WHILE (low <= high)
+          mid = low + ISHFT(high - low, -1)
+          test_prod = new_mpi_from_integer(mid)
+          test_prod = shifted_den * test_prod
+          IF (current_rem < test_prod) THEN
+            high = mid - 1
+          ELSE
+            q_digit = mid
+            low = mid + 1
+          END IF
+        END DO
       END IF
 
       IF (q_digit > 0) THEN
-          q%coeffs(k+1) = q_digit
-          test_prod = new_mpi_from_integer(q_digit)
-          current_rem = current_rem - (shifted_den * test_prod)
+        q%coeffs(k+1) = q_digit
+        test_prod = new_mpi_from_integer(q_digit)
+        current_rem = current_rem - (shifted_den * test_prod)
       END IF
     END DO
 
