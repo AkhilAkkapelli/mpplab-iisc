@@ -7,7 +7,7 @@
 2. Creating new MPI from coefficient arrays working properly. ✅
 3. New MPI from integer and MPI to integer work properly! ✅✅
 4. Scalar multiplication tests all run successfully ✅
-5. Scalar Division not working properly. It having errors in the random tests and edge case tests! ❌
+5. Scalar Division tests passes! ✅
 
 ## Caveats and Changes
 
