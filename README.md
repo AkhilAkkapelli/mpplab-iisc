@@ -8,6 +8,7 @@
 3. New MPI from integer and MPI to integer work properly! ✅✅
 4. Scalar multiplication tests all run successfully ✅
 5. Scalar Division tests passes! ✅
+6. String Conversion Cases Passed! ✅
 
 ## Caveats and Changes
 
