@@ -29,16 +29,16 @@ MODULE multi_precision_integer_mod
 
   PUBLIC :: COEFFS_LIMIT, MULTI_PRECISION_BASE, mpi, normalize_mpi, new_mpi_from_coeffs, new_mpi_from_integer, &
             mpi_to_integer, mpi_to_string, new_mpi_from_string, mpi_div_rem, &
-            mpi_shift_bits_right, mpi_is_zero, mpi_sign, mpi_size, mpi_max_value, mpi_abs, mpi_shift_bits_left, &
-            mpi_multiply_by_scalar, mpi_div_by_scalar, &
+            mpi_is_zero, mpi_sign, mpi_size, mpi_max_value, mpi_abs, &
+            mpi_multiply_by_scalar, mpi_div_by_scalar, mpi_shift_bits_coeffs, &
             OPERATOR(+), OPERATOR(-), OPERATOR(*), OPERATOR(==), OPERATOR(<)
 CONTAINS
 
   SUBROUTINE normalize_mpi(mpi_val)
     TYPE(mpi), INTENT(INOUT) :: mpi_val
 
-    INTEGER(KIND=8) :: carry, current_coeff_val
-    INTEGER :: i, msb_idx, sign
+    INTEGER(KIND=8) :: carry, current_coeff_val, sign
+    INTEGER :: i, msb_idx
 
     IF(mpi_is_zero(mpi_val)) RETURN
 
@@ -47,16 +47,12 @@ CONTAINS
       current_coeff_val = mpi_val%coeffs(i) + carry
       carry = current_coeff_val / MULTI_PRECISION_BASE
       mpi_val%coeffs(i) = current_coeff_val - carry * MULTI_PRECISION_BASE
-      IF (mpi_val%coeffs(i) /= 0_8) msb_idx = i
+      IF (mpi_val%coeffs(i) /= 0_8 .AND. carry == 0_8) msb_idx = i
     END DO
 
     IF(carry /= 0_8) print*, "overflow"
 
-    IF (mpi_val%coeffs(msb_idx) > 0_8) THEN
-      sign = 1_8
-    ELSE
-      sign = -1_8
-    END IF
+    sign = KISIGN(1_8, mpi_val%coeffs(msb_idx))
 
     DO i = 1, msb_idx - 1
       IF (sign * mpi_val%coeffs(i) < 0_8) THEN
@@ -121,8 +117,8 @@ CONTAINS
   END FUNCTION mpi_to_integer
 
   SUBROUTINE mpi_multiply_by_scalar(mpi_val, scalar)
-    TYPE(mpi), INTENT(INOUT) :: mpi_val
-    INTEGER(KIND=8), INTENT(IN)   :: scalar
+    TYPE(mpi), INTENT(INOUT)    :: mpi_val
+    INTEGER(KIND=8), INTENT(IN) :: scalar
 
     INTEGER(KIND=8) :: carry, prod
     INTEGER :: i
@@ -153,88 +149,74 @@ CONTAINS
 
   END FUNCTION mpi_div_by_scalar
 
-  FUNCTION mpi_shift_bits_left(mpi_in, num_bits) RESULT(mpi_out)
-    TYPE(mpi), INTENT(IN) :: mpi_in
-    INTEGER, INTENT(IN)     :: num_bits
-    TYPE(mpi)             :: mpi_out
+  SUBROUTINE mpi_shift_bits_coeffs(coeffs, num_bits)
+    INTEGER(KIND=8), INTENT(INOUT) :: coeffs(:)
+    INTEGER,        INTENT(IN)     :: num_bits
 
-    TYPE(mpi) :: mpi_abs_in
-    LOGICAL :: is_negative
-    INTEGER :: word_shift, bit_shift, i
-    INTEGER(KIND=8) :: low_part, high_part
+    INTEGER :: word_shift, bit_shift, sign_num_bits, n, i
+    INTEGER(KIND=8) :: sign_coeffs, carry, val, res
+    
+    IF(num_bits == 0 .OR. size(coeffs) == 0 .OR. ALL(coeffs == 0_8)) RETURN
 
-    IF (num_bits <= 0) THEN
-      mpi_out = mpi_in
+    word_shift = SHIFTR(ABS(num_bits), 5)
+    bit_shift = IAND(ABS(num_bits), 31)
+
+    n = size(coeffs)
+    DO i = n, 1, -1
+      IF (coeffs(i) /= 0_8) THEN
+        sign_coeffs = SIGN(1_8, coeffs(i))
+        EXIT
+      END IF
+    END DO
+
+    IF (word_shift >= n) THEN
+      coeffs = 0_8
       RETURN
     END IF
 
-    IF (mpi_is_zero(mpi_in)) THEN
-        mpi_out%coeffs = 0_8
-        RETURN
+    coeffs = sign_coeffs * coeffs
+
+    IF (num_bits > 0) THEN
+       IF (word_shift > 0) THEN
+          DO i = n, word_shift + 1, -1
+             coeffs(i) = coeffs(i - word_shift)
+          END DO
+          coeffs(1:word_shift) = 0_8
+       END IF
+       
+       IF (bit_shift > 0) THEN
+          carry = 0_8
+          DO i = 1, n
+             val = coeffs(i)
+             res = IOR(ISHFT(val, bit_shift), carry)
+             coeffs(i) = IAND(res, INT(Z'FFFFFFFF', KIND=8))
+             carry = ISHFT(val, bit_shift - 32)
+          END DO
+       END IF
+    ELSE IF (num_bits < 0) THEN
+       IF (word_shift > 0) THEN
+          DO i = 1, n - word_shift
+             coeffs(i) = coeffs(i + word_shift)
+          END DO
+          coeffs(n - word_shift + 1 : n) = 0_8
+       END IF
+       
+       IF (bit_shift > 0) THEN
+          carry = 0_8
+          DO i = n, 1, -1
+             val = coeffs(i)
+             res = IOR(ISHFT(val, -bit_shift), ISHFT(carry, 32 - bit_shift))
+             carry = IAND(val, ISHFT(1_8, bit_shift) - 1_8)
+             coeffs(i) = res
+          END DO
+       END IF
     END IF
 
-    is_negative = mpi_sign(mpi_in)
-    mpi_abs_in = mpi_abs(mpi_in)
-
-    word_shift = SHIFTR(num_bits, 5)
-    bit_shift = IAND(num_bits, 31)
+    ! IF(ANY(coeffs(:) >= MULTI_PRECISION_BASE)) PRINT*, "MPI Shift out of limits"
     
-    IF (word_shift > 0) THEN
-      mpi_out%coeffs(1:min(word_shift, COEFFS_LIMIT)) = 0_8
-    END IF
+    coeffs = sign_coeffs * coeffs
 
-    IF (word_shift >= COEFFS_LIMIT) RETURN
-    
-    high_part = 0_8
-    DO i = 1, COEFFS_LIMIT - word_shift
-        low_part = IAND(ISHFT(mpi_abs_in%coeffs(i), bit_shift), INT(Z'FFFFFFFF', KIND=8))
-        IF (i + word_shift <= COEFFS_LIMIT) mpi_out%coeffs(i + word_shift) = IOR(low_part, high_part)
-        high_part = ISHFT(ISHFT(mpi_abs_in%coeffs(i), bit_shift), -32)
-    END DO
-
-    IF (is_negative) mpi_out = -mpi_out
-    
-  END FUNCTION mpi_shift_bits_left
-
-FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
-    TYPE(mpi), INTENT(IN) :: mpi_in
-    INTEGER, INTENT(IN)     :: num_bits
-    TYPE(mpi)             :: mpi_out
-
-    TYPE(mpi) :: mpi_abs_in
-    LOGICAL :: is_negative
-    INTEGER :: word_shift, bit_shift, i
-    INTEGER(KIND=8) :: low_part, high_part
-
-    IF (num_bits <= 0) THEN
-      mpi_out = mpi_in
-      RETURN
-    END IF
-
-    IF (mpi_is_zero(mpi_in)) THEN
-        mpi_out%coeffs = 0_8
-        RETURN
-    END IF
-
-    is_negative = mpi_sign(mpi_in)
-    mpi_abs_in = mpi_abs(mpi_in)
-
-    word_shift = SHIFTR(num_bits, 5)
-    bit_shift = IAND(num_bits, 31)
-
-    mpi_out%coeffs = 0_8
-    IF (word_shift >= COEFFS_LIMIT) RETURN
-
-    low_part = 0_8
-    DO i = COEFFS_LIMIT, word_shift + 1, -1
-        high_part = IAND(ISHFT(mpi_abs_in%coeffs(i), -bit_shift), INT(Z'FFFFFFFF', KIND=8))
-        mpi_out%coeffs(i - word_shift) = IOR(high_part, low_part)
-        low_part = ISHFT(IAND(mpi_abs_in%coeffs(i), ISHFT(1_8, bit_shift) - 1_8), 32 - bit_shift)
-    END DO
-
-    IF (is_negative) mpi_out = -mpi_out
-    
-  END FUNCTION mpi_shift_bits_right
+  END SUBROUTINE mpi_shift_bits_coeffs
 
   SUBROUTINE mpi_div_rem(numerator, denominator, quotient, remainder)
     TYPE(mpi), INTENT(IN)  :: numerator, denominator
@@ -326,11 +308,12 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
 
     FUNCTION mpi_scale_up_by_base_power(mpi_in, power) RESULT(mpi_out)
     TYPE(mpi), INTENT(IN) :: mpi_in
-    INTEGER, INTENT(IN)     :: power
+    INTEGER,   INTENT(IN) :: power
+
     TYPE(mpi)             :: mpi_out
 
     IF (power < 0 .OR. power >= COEFFS_LIMIT) THEN
-      STOP "mpi_scale_up_by_base_power: Invalid power."
+      print*, "mpi_scale_up_by_base_power: Invalid power."
     END IF
     IF (power == 0) THEN
       mpi_out = mpi_in
@@ -451,14 +434,14 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
   END FUNCTION mpi_subtract
 
   FUNCTION mpi_abs(mpi_in) RESULT(mpi_out)
-      TYPE(mpi), INTENT(IN) :: mpi_in
-      TYPE(mpi) :: mpi_out
-      IF (.NOT. mpi_sign(mpi_in)) THEN
-          mpi_out = mpi_in
-      ELSE
-          mpi_out%coeffs = -mpi_in%coeffs
-          CALL normalize_mpi(mpi_out)
-      END IF
+    TYPE(mpi), INTENT(IN) :: mpi_in
+    TYPE(mpi) :: mpi_out
+    IF (.NOT. mpi_sign(mpi_in)) THEN
+        mpi_out = mpi_in
+    ELSE
+        mpi_out%coeffs = -mpi_in%coeffs
+        CALL normalize_mpi(mpi_out)
+    END IF
   END FUNCTION mpi_abs
 
   FUNCTION mpi_multiply(a, b) RESULT(prod_mpi)
@@ -506,12 +489,11 @@ FUNCTION mpi_shift_bits_right(mpi_in, num_bits) RESULT(mpi_out)
 
     IF (final_is_neg) THEN
       prod_mpi%coeffs = -prod_mpi%coeffs
-      CALL normalize_mpi(prod_mpi)
     END IF
 
   END FUNCTION mpi_multiply
 
-    FUNCTION mpi_to_string(mpi_in) RESULT(str_out)
+  FUNCTION mpi_to_string(mpi_in) RESULT(str_out)
     TYPE(mpi), INTENT(IN)       :: mpi_in
     CHARACTER(LEN=:), ALLOCATABLE :: str_out
 
